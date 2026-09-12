@@ -1,0 +1,763 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
+<meta name="apple-mobile-web-app-title" content="tracker" />
+<meta name="theme-color" content="#f7ebe4" />
+<title>tracker</title>
+<style>
+  * { box-sizing:border-box; }
+  html, body { height:100%; margin:0; }
+  body {
+    --ink:#26281f; --muted:#7c7d6e; --faint:#a9a99a;
+    --paper:#f7ebe4; --panel:#fcf4ef; --line:#ecddd1;
+    --moss:#d97757; --moss-soft:#f3ddd1;
+    --teal:#3d7a86; --teal-soft:#cfe0e2;
+    --amber:#bd7a2c;
+    --dead:#e0842a; --dead-soft:#f9e3ca;
+    --done:#3f8a52; --done-soft:#d9ecdf;
+    font-family: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color:var(--ink); background:var(--paper);
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap {
+    min-height:100%;
+    padding:calc(22px + env(safe-area-inset-top)) 16px calc(34px + env(safe-area-inset-bottom));
+    display:flex; justify-content:center;
+  }
+  .board { width:100%; max-width:440px; }
+  .serif { font-family:ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+
+  .weeknav { display:flex; align-items:center; gap:10px; margin-bottom:12px; }
+  .wkbtn { width:38px; height:38px; border-radius:10px; border:1px solid var(--line); background:var(--panel); color:var(--ink); display:grid; place-items:center; cursor:pointer; padding:0; }
+  .wkbtn:hover { border-color:#cfc9b6; }
+  .wkbtn:active { transform:scale(.92); }
+  .wkcenter { flex:1 1 auto; text-align:center; display:flex; flex-direction:column; align-items:center; gap:3px; }
+  .wkrange { font-family:ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-weight:600; font-size:16px; line-height:1; }
+  .wkstart { font-family:inherit; font-size:12px; color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:3px 7px; }
+  .wkt { font-family:ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-weight:600; font-size:15px; }
+
+  .strip { display:grid; grid-template-columns:repeat(7,1fr); gap:6px; margin-bottom:20px; }
+  .day { border:1px solid var(--line); background:var(--panel); border-radius:12px;
+    padding:9px 2px; text-align:center; cursor:pointer; transition:background .12s,border-color .12s; position:relative; }
+  .day:hover { border-color:#cfc9b6; }
+  .day.sel { background:var(--ink); border-color:var(--ink); }
+  .day.sel .dow { color:var(--panel); }
+  .dow { font-size:14px; font-weight:600; color:var(--ink); }
+  .dnum { font-family:ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-size:13px; font-weight:600; margin-top:2px; line-height:1; color:var(--muted); }
+  .day.sel .dnum { color:var(--paper); }
+  .todot { width:4px; height:4px; border-radius:50%; background:var(--moss); position:absolute; top:6px; right:6px; }
+  .day.sel .todot { background:var(--moss-soft); }
+  .day.off { background:var(--dead-soft); border-color:#edcca1; }
+  .day.off .dow, .day.off .dnum { color:var(--ink); }
+  .day.sel.off { border-color:var(--dead); }
+  .day.off .todot { background:var(--dead); }
+  .day.done { background:var(--done-soft); border-color:#b3d6c0; }
+  .day.done .dow, .day.done .dnum { color:var(--ink); }
+  .day.sel.done { border-color:var(--done); }
+  .day.done .todot { background:var(--done); }
+
+  .dayhead { display:flex; align-items:center; justify-content:center; gap:14px; margin:2px 0 12px; }
+  .dhleft { width:180px; }
+  .dhright { width:156px; }
+  .dhtitle { font-family:ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-weight:600; font-size:16px; }
+
+  .cols { display:flex; gap:14px; align-items:flex-start; justify-content:center; }
+  .side { display:flex; flex-direction:column; gap:12px; flex:0 0 auto; }
+  .panel { border:1px solid var(--line); background:var(--panel); border-radius:14px; padding:2px 12px; }
+  .panel.left { width:180px; }
+  .panel.right { width:156px; }
+  .panel.purple { background:#f1ecf8; border-color:#ddd3ea; }
+  .dayflags { display:flex; gap:6px; }
+  .flagtoggle { font-family:inherit; font-size:11.5px; color:var(--ink); background:var(--panel); border:1px solid var(--line); border-radius:9px; padding:6px 8px; cursor:pointer; white-space:nowrap; }
+  .flagtoggle:active { transform:scale(.96); }
+  .flagtoggle.on.complete { background:var(--done); border-color:var(--done); color:#fff; }
+  .flagtoggle.on.off { background:var(--dead); border-color:var(--dead); color:var(--ink); }
+  .hitem { padding:5px 2px; border-bottom:1px solid var(--line); }
+  .hitem:last-child { border-bottom:none; }
+  .hitem.shade { background:#f8e1c9; margin-left:-12px; margin-right:-12px; padding-left:14px; padding-right:14px; }
+  .hrow { display:flex; align-items:center; gap:12px; }
+  .hrow.tap { cursor:pointer; }
+  .hkey { flex:0 0 40px; font-weight:600; font-size:13px; color:var(--ink); }
+  .hnote { flex:0 0 46px; font-size:12px; color:var(--muted); }
+  .wnote { flex:1 1 auto; min-width:0; font-family:inherit; font-size:12px; color:var(--ink); background:#fff; border:1px solid var(--line); border-radius:6px; padding:3px 6px; }
+  .wnote:focus { outline:none; }
+  .tagbox { flex:1 1 auto; min-width:0; font-family:inherit; font-size:13px; color:#000; background:#fff; border:1px solid var(--line); border-radius:6px; padding:3px 6px; }
+  .tagbox:focus { outline:none; }
+  .tagkey { flex:0 0 auto; }
+  .timebox { flex:0 0 auto; width:76px; box-sizing:border-box; height:20px; font-family:inherit; font-size:13px; color:#000; background:#fff; border:1px solid var(--line); border-radius:5px; padding:0 4px; }
+  .timebox:focus { outline:none; }
+  .chev { margin-left:-4px; color:var(--faint); display:inline-flex; transition:transform .15s ease; }
+  .chev.open { transform:rotate(90deg); }
+
+  /* check toggle */
+  .htoggle { flex:0 0 auto; display:inline-flex; align-items:center; justify-content:center; color:var(--ink);
+    background:none; border:none; padding:2px; cursor:pointer; }
+  .htoggle:active { transform:scale(.9); }
+  .htoggle .box { width:15px; height:15px; border-radius:4px; border:1.5px solid var(--faint); display:grid; place-items:center; }
+  .htoggle .box.yes { border-color:var(--ink); color:var(--ink); }
+  .htoggle .box.no { border-color:var(--moss); color:var(--moss); }
+
+  /* measure input */
+  .measure { flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; }
+  .mbox { width:76px; height:20px; box-sizing:border-box; font-family:inherit; font-weight:400; font-size:13px; line-height:1; color:#000;
+    background:#fff; border:1px solid var(--line); border-radius:5px; padding:0 5px; text-align:center; }
+  .mbox:focus { outline:none; }
+
+  /* counter */
+  .counter { flex:0 0 auto; display:inline-flex; align-items:center; gap:6px; }
+  .cbtn { width:20px; height:20px; border-radius:6px; border:1px solid var(--line); background:var(--paper); color:var(--ink); display:grid; place-items:center; cursor:pointer; padding:0; }
+  .cbtn:active { transform:scale(.9); }
+  .cbtn:disabled { opacity:.35; cursor:default; }
+  .cval { font-family:ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-weight:600; font-size:14px; min-width:14px; text-align:center; }
+
+  /* routine steps */
+  .steps { margin-top:5px; margin-left:52px; display:flex; flex-direction:column; gap:0; }
+  .step { display:flex; align-items:center; gap:9px; padding:3px 2px; cursor:pointer; }
+  .stepcheck { width:15px; height:15px; border-radius:4px; border:1.5px solid var(--faint); display:grid; place-items:center; flex:0 0 auto; }
+  .step.on .stepcheck { border-color:var(--ink); }
+  .stepname { font-size:13px; color:var(--ink); }
+  .step.on .stepname { color:var(--muted); text-decoration:line-through; }
+
+  .foot { display:flex; align-items:center; justify-content:flex-end; margin-top:22px; gap:2px; flex-wrap:wrap; }
+  .reset { display:inline-flex; align-items:center; gap:5px; font-size:12.5px; color:var(--ink); background:none; border:none; cursor:pointer; padding:6px; }
+  .reset:hover { color:var(--ink); }
+
+  .datapanel { margin-top:14px; border:1px solid var(--line); background:var(--panel); border-radius:14px; padding:16px; }
+  .dtitle { font-family:ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; font-weight:600; font-size:15px; margin-bottom:12px; }
+  .dbtns { display:flex; flex-wrap:wrap; gap:8px; }
+  .dbtns button { flex:1 1 auto; font-family:inherit; font-size:12.5px; color:var(--ink);
+    background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:9px 10px; cursor:pointer; }
+  .dbtns button:hover { border-color:#cfc9b6; }
+  .dout { margin-top:10px; }
+  .dta { width:100%; font-family:ui-monospace, SFMono-Regular, Menlo, monospace; font-size:11.5px;
+    color:var(--ink); background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:9px; resize:vertical; line-height:1.4; }
+  .dcopy { margin-top:8px; display:inline-flex; align-items:center; gap:5px; font-family:inherit;
+    font-size:12.5px; color:var(--panel); background:var(--ink); border:1px solid var(--ink); border-radius:9px; padding:8px 12px; cursor:pointer; }
+  .dcopy:disabled { opacity:.4; cursor:default; }
+  .doutbtns { display:flex; gap:8px; margin-top:8px; }
+  .doutbtns .dcopy { margin-top:0; }
+  .dcopy.ghost { background:var(--paper); color:var(--ink); border-color:var(--line); }
+  .dsep { margin:16px 0 8px; font-size:12px; color:var(--ink); }
+  .dmsg { margin-top:10px; font-size:12px; color:var(--ink); line-height:1.45; min-height:1em; }
+
+  @media (prefers-reduced-motion: reduce) { .day,.chev { transition:none; } }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="board">
+    <div id="main"></div>
+  </div>
+</div>
+
+<script>
+(function () {
+  "use strict";
+
+  /* ============================================================
+     HABITS — every tracked item, keyed uniquely.
+       type "check"    -> tap cycles blank / yes / no
+       type "measure"  -> a logged value (free text)
+       type "counter"  -> positive-only tally (optional step)
+       type "routine"  -> a manual check + a checklist (steps)
+     LAYOUT — which panel each key sits in, and in what order.
+     ============================================================ */
+  var HABITS = [
+    // LHS — habits & routines
+    { key: "RT", label: "RT", type: "check" },
+    { key: "DD", label: "DD", type: "check" },
+    { key: "CS", label: "CS", type: "routine", steps: ["TW","Teeth", "Shave", "Skin"] },
+    { key: "TR", label: "TR", type: "check" },
+    { key: "HYD", label: "HYD", type: "counter", step: 500, check: true },
+    { key: "PM", label: "PM", type: "check" },
+    { key: "CP", label: "CP", type: "check" },
+    { key: "COD", label: "COD", type: "check" },	
+    { key: "ECE", label: "ECE", type: "routine", steps: ["Prep Food", "All dishes"], shade: true },
+    { key: "CE", label: "CE", type: "routine", steps: ["Teeth", "Skin", "Prep Alarm", "Prep ProP"] },
+    { key: "STRET", label: "STRET", type: "check" },
+    { key: "ANKI", label: "ANKI", type: "check" },
+    { key: "SUN", label: "SUN", type: "notecheck", note: "FPrep", scope: "week" },
+    { key: "MON", label: "MON", type: "notecheck", note: "Wash", scope: "week" },
+    { key: "TUE", label: "TUE", type: "notecheck", note: "Scan", scope: "week" },
+    { key: "WED", label: "WED", type: "notecheck", note: "FPrep", scope: "week" },
+    { key: "THU", label: "THU", type: "notecheck", note: "Scan", scope: "week" },
+    { key: "FRI", label: "FRI", type: "notecheck", note: "Free", scope: "week" },
+    { key: "SAT", label: "SAT", type: "notecheck", note: "Free", scope: "week" },	
+    // RHS — values
+    { key: "LO", label: "LO", type: "time" },
+    { key: "RT-T", label: "RT-T", type: "time" },
+    { key: "RT-A", label: "RT-A", type: "time" },
+    { key: "SS", label: "SS", type: "measure" },
+    { key: "MHR", label: "MHR", type: "measure" },
+    { key: "WRKS", label: "WRKS", type: "time" },
+    { key: "TRS-T", label: "TRS-T", type: "time" },	
+    { key: "PM-A", label: "PM-A", type: "measure" },
+    { key: "SATU", label: "SATU", type: "measure" },
+    { key: "TSS", label: "TSS", type: "measure" },
+    { key: "TR-L", label: "TR-L", type: "measure" },
+    { key: "RES-L", label: "RES-L", type: "measure" },
+    { key: "DSTR", label: "DSTR", type: "measure" },
+    { key: "TRS-P", label: "TRS-P", type: "measure" },
+    { key: "TRS-A", label: "TRS-A", type: "measure" },
+    { key: "T", label: "Tags", type: "tags" }
+  ];
+
+  var LAYOUT = {
+    left: [
+      { keys: ["RT", "DD", "CS", "TR", "CP", "PM", "CE", "ECE"] },
+      { keys: ["ANKI", "COD","HYD"] },
+      { keys: ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"], tone: "purple" }
+    ],
+    right: [
+      { keys: ["RT-T", "LO","RT-A", "SS", "MHR"] },
+      { keys: ["WRKS", "PM-A", "SATU"] },
+      { keys: ["STRET","TRS-P", "TRS-A","TRS-T","TSS", "TR-L", "RES-L"] },	  	  
+	  { keys: ["DSTR"] },	 
+      { keys: ["T"] }
+    ]
+  };
+
+  var byKey = {};
+  HABITS.forEach(function (h) { byKey[h.key] = h; });
+  var DAY_HABITS = HABITS.filter(function (h) { return h.scope !== "week"; });
+  var WEEK_HABITS = HABITS.filter(function (h) { return h.scope === "week"; });
+  var TOTAL = HABITS.length;
+  var LS = window.localStorage;
+
+  /* ---------- icons ---------- */
+  function svg(size, inner, sw) {
+    return '<svg width="' + size + '" height="' + size + '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (sw || 2) + '" stroke-linecap="round" stroke-linejoin="round">' + inner + '</svg>';
+  }
+  var ICON = {
+    chevL: svg(18, '<polyline points="15 18 9 12 15 6"/>', 2.2),
+    chevR: svg(18, '<polyline points="9 18 15 12 9 6"/>', 2.2),
+    chev:  svg(15, '<polyline points="9 18 15 12 9 6"/>', 2.2),
+    check: svg(11, '<polyline points="20 6 9 17 4 12"/>', 2.5),
+    x:     svg(11, '<path d="M18 6 6 18"/><path d="m6 6 12 12"/>', 2.5),
+    minus: svg(12, '<line x1="5" y1="12" x2="19" y2="12"/>', 2.2),
+    plus:  svg(12, '<line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>', 2.2),
+    share: svg(13, '<path d="M4 12v7a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-7"/><polyline points="8 6 12 2 16 6"/><line x1="12" y1="2" x2="12" y2="15"/>'),
+    db:    svg(13, '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/>'),
+    rot:   svg(13, '<polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>'),
+    copy:  svg(13, '<rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>')
+  };
+
+  /* ---------- helpers ---------- */
+  function escHtml(s) { return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+  function escAttr(s) { return String(s).replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/</g, "&lt;").replace(/>/g, "&gt;"); }
+
+  function emptyValue(h) {
+    if (h.type === "measure" || h.type === "tags" || h.type === "time") return "";
+    if (h.type === "routine") return {};
+    if (h.type === "counter") return h.check ? { n: 0, c: 0 } : 0;
+    if (h.type === "notecheck") return { c: 0, t: h.note || "" };
+    return 0; // check
+  }
+  function shallow(o) { var n = {}; if (o && typeof o === "object") { for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) n[k] = o[k]; } return n; }
+
+  function normVal(h, v) {
+    if (h.type === "check") { var n = Number(v); return v === true ? 1 : (n === 1 || n === 2 ? n : 0); }
+    if (h.type === "counter") {
+      if (h.check) {
+        var rawN = (v && typeof v === "object") ? v.n : v;
+        var cn = Math.floor(Number(rawN));
+        var cc = (v && typeof v === "object" && (Number(v.c) === 1 || Number(v.c) === 2)) ? Number(v.c) : 0;
+        return { n: cn > 0 ? cn : 0, c: cc };
+      }
+      var c2 = Math.floor(Number(v)); return c2 > 0 ? c2 : 0;
+    }
+    if (h.type === "measure" || h.type === "tags" || h.type === "time") return typeof v === "string" ? v : (typeof v === "number" ? String(v) : "");
+    if (h.type === "notecheck") {
+      var nc = v && (Number(v.c) === 1 || Number(v.c) === 2) ? Number(v.c) : 0;
+      var nt = v && typeof v.t === "string" ? v.t : (h.note || "");
+      return { c: nc, t: nt };
+    }
+    var obj = {};
+    if (v && typeof v === "object") {
+      h.steps.forEach(function (_, i) { if (v[i]) obj[i] = true; });
+      var dn = v.done === true ? 1 : Number(v.done);
+      if (dn === 1 || dn === 2) obj.done = dn;
+    }
+    return obj;
+  }
+
+  function emptyDay() {
+    var d = {};
+    DAY_HABITS.forEach(function (h) { d[h.key] = emptyValue(h); });
+    d.__mark = "";
+    return d;
+  }
+  function cloneDay(d) {
+    var out = {};
+    DAY_HABITS.forEach(function (h) {
+      var v = d[h.key];
+      out[h.key] = (v && typeof v === "object") ? shallow(v) : v;
+    });
+    out.__mark = d.__mark || "";
+    return out;
+  }
+  function normalizeDay(raw) {
+    var d = emptyDay();
+    if (!raw || typeof raw !== "object") return d;
+    DAY_HABITS.forEach(function (h) { d[h.key] = normVal(h, raw[h.key]); });
+    d.__mark = raw.__mark === "off" || raw.__mark === "complete" ? raw.__mark : "";
+    return d;
+  }
+
+  function emptyWeek() {
+    var w = {};
+    WEEK_HABITS.forEach(function (h) { w[h.key] = emptyValue(h); });
+    return w;
+  }
+  function cloneWeek(w) {
+    var out = {};
+    WEEK_HABITS.forEach(function (h) {
+      var v = w[h.key];
+      out[h.key] = (h.type === "routine" || h.type === "notecheck") ? shallow(v) : v;
+    });
+    return out;
+  }
+  function normalizeWeek(raw) {
+    var w = emptyWeek();
+    if (!raw || typeof raw !== "object") return w;
+    WEEK_HABITS.forEach(function (h) { w[h.key] = normVal(h, raw[h.key]); });
+    return w;
+  }
+
+  function isDone(h, v) {
+    if (h.type === "check") return v === 1;
+    if (h.type === "measure" || h.type === "tags" || h.type === "time") return typeof v === "string" && v.trim() !== "";
+    if (h.type === "counter") return h.check ? Number(v && v.n) > 0 : Number(v) > 0;
+    if (h.type === "notecheck") return !!(v && v.c === 1);
+    return !!(v && v.done === 1);
+  }
+  function scoreOf(d) { return HABITS.reduce(function (a, h) { return a + (isDone(h, d[h.key]) ? 1 : 0); }, 0); }
+
+  /* ---------- date helpers ---------- */
+  function toKey(d) {
+    var y = d.getFullYear(), m = String(d.getMonth() + 1).padStart(2, "0"), day = String(d.getDate()).padStart(2, "0");
+    return y + "-" + m + "-" + day;
+  }
+  function mondayOf(ref) {
+    var d = new Date(ref), dow = (d.getDay() + 6) % 7;
+    var m = new Date(d); m.setDate(d.getDate() - dow); m.setHours(0, 0, 0, 0);
+    return m;
+  }
+  function addDays(ref, n) { var x = new Date(ref); x.setDate(x.getDate() + n); x.setHours(0, 0, 0, 0); return x; }
+  function daysFrom(start) { var o = []; for (var i = 0; i < 7; i++) o.push(addDays(start, i)); return o; }
+  function rangeLabel(start) {
+    var end = addDays(start, 6);
+    var mon = function (d) { return d.toLocaleDateString("en-GB", { month: "short" }); };
+    var y = end.getFullYear();
+    if (start.getMonth() === end.getMonth()) return start.getDate() + " \u2013 " + end.getDate() + " " + mon(end) + " " + y;
+    return start.getDate() + " " + mon(start) + " \u2013 " + end.getDate() + " " + mon(end) + " " + y;
+  }
+  function dowLabel(date) { return date.toLocaleDateString("en-GB", { weekday: "short" }).toUpperCase(); }
+  function dayHeading(d) {
+    if (!d) return "";
+    if (d.key === state.todayKey) return "Today";
+    return d.date.toLocaleDateString("en-GB", { weekday: "short", day: "numeric", month: "short" });
+  }
+
+  /* ---------- storage (localStorage) ---------- */
+  function loadDayLS(key) { try { var v = LS.getItem("day:" + key); return normalizeDay(v ? JSON.parse(v) : null); } catch (e) { return emptyDay(); } }
+  function saveDayLS(key, data) { try { LS.setItem("day:" + key, JSON.stringify(data)); } catch (e) {} }
+  function delDayLS(key) { try { LS.removeItem("day:" + key); } catch (e) {} }
+  function loadWeekLS(key) { try { var v = LS.getItem("week:" + key); return normalizeWeek(v ? JSON.parse(v) : null); } catch (e) { return emptyWeek(); } }
+  function saveWeekLS(key, data) { try { LS.setItem("week:" + key, JSON.stringify(data)); } catch (e) {} }
+  function delWeekLS(key) { try { LS.removeItem("week:" + key); } catch (e) {} }
+
+  /* ---------- backup / restore (current week) ---------- */
+  function collectWeek() {
+    var out = { app: "daily-tracker", version: 1, weekStart: toKey(state.weekStart), exported: new Date().toISOString(),
+      habits: HABITS.map(function (h) { var o = { key: h.key, label: h.label, type: h.type }; if (h.steps) o.steps = h.steps; return o; }), days: {}, week: state.weekData || {} };
+    state.days.forEach(function (d) { out.days[d.key] = d.data; });
+    return out;
+  }
+
+  /* ---------- state ---------- */
+  var state = { days: [], selected: null, todayKey: null, weekStart: null, open: {}, weekData: {} };
+
+  function loadWeek(start) {
+    state.weekStart = new Date(start); state.weekStart.setHours(0, 0, 0, 0);
+    state.days = daysFrom(state.weekStart).map(function (date) { var k = toKey(date); return { key: k, date: date, data: loadDayLS(k) }; });
+    state.weekData = loadWeekLS(toKey(state.weekStart));
+    if (!state.selected || !state.days.some(function (d) { return d.key === state.selected; })) {
+      state.selected = state.days.some(function (d) { return d.key === state.todayKey; }) ? state.todayKey : state.days[0].key;
+    }
+    renderMain();
+  }
+  function goToWeek(start) { state.selected = null; loadWeek(start); }
+  function selDay() { return state.days.filter(function (d) { return d.key === state.selected; })[0]; }
+
+  /* ---------- render ---------- */
+  function renderHabit(h, v) {
+    var lbl = escAttr(h.label);
+    if (h.type === "time") {
+      return '<div class="hitem"><div class="hrow">' +
+        '<span class="hkey" title="' + lbl + '">' + escHtml(h.key) + '</span>' +
+        '<input type="time" class="timebox" data-action="measure" data-key="' + escAttr(h.key) + '" value="' + escAttr(v || "") + '" aria-label="' + lbl + '" /></div></div>';
+    }
+    if (h.type === "tags") {
+      return '<div class="hitem"><div class="hrow">' +
+        '<span class="hkey tagkey" title="' + lbl + '">' + escHtml(h.key) + '</span>' +
+        '<input type="text" class="tagbox" data-action="measure" data-key="' + escAttr(h.key) + '" value="' + escAttr(v || "") + '" aria-label="' + lbl + '" /></div></div>';
+    }
+    if (h.type === "notecheck") {
+      var nv = v || { c: 0, t: h.note || "" };
+      var nst = (nv.c === 1 || nv.c === 2) ? nv.c : 0;
+      return '<div class="hitem"><div class="hrow">' +
+        '<span class="hkey">' + escHtml(h.key) + '</span>' +
+        '<input type="text" class="wnote" data-action="weeknote" data-key="' + escAttr(h.key) + '" value="' + escAttr(nv.t || "") + '" aria-label="' + lbl + ' note" />' +
+        '<button class="htoggle" data-action="check" data-key="' + escAttr(h.key) + '" data-scope="week" title="' + lbl + '">' +
+        '<span class="box' + (nst === 1 ? " yes" : nst === 2 ? " no" : "") + '">' + (nst === 1 ? ICON.check : nst === 2 ? ICON.x : "") + '</span>' +
+        '</button></div></div>';
+    }
+    if (h.type === "check") {
+      var st = (v === 1 || v === 2) ? v : 0;
+      return '<div class="hitem"><div class="hrow">' +
+        '<span class="hkey">' + escHtml(h.key) + '</span>' +
+        (h.note ? '<span class="hnote">' + escHtml(h.note) + '</span>' : '') +
+        '<button class="htoggle" data-action="check" data-key="' + escAttr(h.key) + '"' + (h.scope === "week" ? ' data-scope="week"' : '') + ' title="' + lbl + '">' +
+        '<span class="box' + (st === 1 ? " yes" : st === 2 ? " no" : "") + '">' + (st === 1 ? ICON.check : st === 2 ? ICON.x : "") + '</span>' +
+        '</button></div></div>';
+    }
+    if (h.type === "counter") {
+      var n = h.check ? (Number(v && v.n) || 0) : (Number(v) || 0);
+      var cst = (h.check && v && (v.c === 1 || v.c === 2)) ? v.c : 0;
+      var cbox = h.check ? ('<button class="htoggle" data-action="ccheck" data-key="' + escAttr(h.key) + '" title="' + lbl + ' check">' +
+        '<span class="box' + (cst === 1 ? " yes" : cst === 2 ? " no" : "") + '">' + (cst === 1 ? ICON.check : cst === 2 ? ICON.x : "") + '</span>' +
+        '</button>') : '';
+      return '<div class="hitem"><div class="hrow">' +
+        '<span class="hkey" title="' + lbl + '">' + escHtml(h.key) + '</span>' +
+        '<div class="counter">' + cbox +
+        '<button class="cbtn" data-action="cdec" data-key="' + escAttr(h.key) + '"' + (n <= 0 ? " disabled" : "") + ' aria-label="minus">' + ICON.minus + '</button>' +
+        '<span class="cval serif">' + n + '</span>' +
+        '<button class="cbtn" data-action="cinc" data-key="' + escAttr(h.key) + '" aria-label="plus">' + ICON.plus + '</button>' +
+        '</div></div></div>';
+    }
+    if (h.type === "measure") {
+      return '<div class="hitem"><div class="hrow">' +
+        '<span class="hkey" title="' + lbl + '">' + escHtml(h.key) + '</span>' +
+        '<div class="measure"><input type="text" class="mbox" data-action="measure" data-key="' + escAttr(h.key) + '" value="' + escAttr(v || "") + '" aria-label="' + lbl + ' value" /></div>' +
+        '</div></div>';
+    }
+    // routine
+    var rst = (v && (v.done === 1 || v.done === 2)) ? v.done : 0;
+    var open = !!state.open[h.key];
+    var html = '<div class="hitem' + (h.shade ? " shade" : "") + '"><div class="hrow tap" data-action="ropen" data-key="' + escAttr(h.key) + '">' +
+      '<span class="hkey" title="' + lbl + '">' + escHtml(h.key) + '</span>' +
+      '<button class="htoggle" data-action="rdone" data-key="' + escAttr(h.key) + '" title="' + lbl + ' status">' +
+      '<span class="box' + (rst === 1 ? " yes" : rst === 2 ? " no" : "") + '">' + (rst === 1 ? ICON.check : rst === 2 ? ICON.x : "") + '</span>' +
+      '</button>' +
+      '<span class="chev' + (open ? " open" : "") + '">' + ICON.chev + '</span>' +
+      '</div>';
+    if (open) {
+      html += '<div class="steps">';
+      h.steps.forEach(function (label, i) {
+        var on = !!(v && v[i]);
+        html += '<div class="step' + (on ? " on" : "") + '" data-action="step" data-key="' + escAttr(h.key) + '" data-idx="' + i + '">' +
+          '<span class="stepcheck">' + (on ? ICON.check : "") + '</span>' +
+          '<span class="stepname">' + escHtml(label) + '</span></div>';
+      });
+      html += '</div>';
+    }
+    html += '</div>';
+    return html;
+  }
+
+  function panelHtml(side, panels) {
+    var s = '';
+    var d = selDay();
+    panels.forEach(function (panel) {
+      s += '<div class="panel ' + side + (panel.tone ? ' ' + panel.tone : '') + '"><div class="items">';
+      panel.keys.forEach(function (k) {
+        var h = byKey[k];
+        if (h) { var val = h.scope === "week" ? state.weekData[k] : d.data[k]; s += renderHabit(h, val); }
+      });
+      s += '</div></div>';
+    });
+    return s;
+  }
+
+  function renderMain() {
+    var d = selDay();
+    var html = '';
+
+    html += '<div class="weeknav">' +
+      '<button class="wkbtn" data-action="prevweek" aria-label="Previous week">' + ICON.chevL + '</button>' +
+      '<div class="wkcenter"><div class="wkrange serif">' + rangeLabel(state.weekStart) + '</div>' +
+      '<input type="date" class="wkstart" data-action="setstart" value="' + toKey(state.weekStart) + '" aria-label="Week start date" /></div>' +
+      '<button class="wkbtn wkt" data-action="thisweek" aria-label="Jump to this week">T</button>' +
+      '<button class="wkbtn" data-action="nextweek" aria-label="Next week">' + ICON.chevR + '</button>' +
+      '</div>';
+
+    html += '<div class="strip">';
+    state.days.forEach(function (dd) {
+      var mk = dd.data.__mark;
+      var cls = mk === "off" ? " off" : mk === "complete" ? " done" : "";
+      html += '<div class="day' + (dd.key === state.selected ? " sel" : "") + cls + '" data-action="selday" data-key="' + dd.key + '">' +
+        (dd.key === state.todayKey ? '<span class="todot"></span>' : "") +
+        '<div class="dow">' + dowLabel(dd.date) + '</div>' +
+        '<div class="dnum">' + dd.date.getDate() + '</div></div>';
+    });
+    html += '</div>';
+
+    var mk = d.data.__mark;
+    var flags = '<div class="dayflags">' +
+      '<button class="flagtoggle off' + (mk === "off" ? " on" : "") + '" data-action="markoff">Off Day</button>' +
+      '<button class="flagtoggle complete' + (mk === "complete" ? " on" : "") + '" data-action="markcomplete">Complete</button>' +
+      '</div>';
+    html += '<div class="dayhead"><div class="dhleft"><span class="dhtitle">' + escHtml(dayHeading(d)) + '</span></div>' +
+      '<div class="dhright">' + flags + '</div></div>';
+
+    html += '<div class="cols"><div class="side left">' + panelHtml("left", LAYOUT.left) + '</div>' +
+      '<div class="side right">' + panelHtml("right", LAYOUT.right) + '</div></div>';
+
+    html += '<div class="foot">' +
+      '<button class="reset" data-action="quicksave">' + ICON.share + ' Save</button>' +
+      '<button class="reset" data-action="resetday">' + ICON.rot + ' Reset day</button>' +
+      '<button class="reset" data-action="reset">' + ICON.rot + ' Reset week</button>' +
+      '</div>';
+
+    document.getElementById("main").innerHTML = html;
+  }
+
+  /* ---------- mutations ---------- */
+  function withDay(fn) {
+    var d = selDay();
+    if (!d) return;
+    var data = cloneDay(d.data);
+    fn(data);
+    d.data = data;
+    saveDayLS(d.key, data);
+  }
+  function markDay(which) {
+    var d = selDay();
+    if (!d) return;
+    var data = cloneDay(d.data);
+    data.__mark = data.__mark === which ? "" : which;
+    d.data = data;
+    saveDayLS(d.key, data);
+  }
+  function weekCheck(key) {
+    var data = cloneWeek(state.weekData);
+    var h = byKey[key];
+    if (h.type === "notecheck") {
+      var cur = data[key] || { c: 0, t: h.note || "" };
+      cur.c = (Number(cur.c) + 1) % 3;
+      data[key] = cur;
+    } else {
+      data[key] = (Number(data[key]) + 1) % 3;
+    }
+    state.weekData = data;
+    saveWeekLS(toKey(state.weekStart), data);
+  }
+
+  /* ---------- data panel ---------- */
+  function setMsg(m) { document.getElementById("dp-msg").textContent = m; }
+  function setOut(text, msg) {
+    document.getElementById("dp-out").value = text;
+    document.getElementById("dp-out-wrap").style.display = "block";
+    setMsg(msg);
+  }
+  function toggleData() {
+    var p = document.getElementById("datapanel");
+    p.style.display = (p.style.display === "none" ? "block" : "none");
+    setMsg("");
+  }
+  function quickSave() {
+    var text = JSON.stringify(collectWeek(), null, 2);
+    var fname = "tracker-" + toKey(state.weekStart) + ".json";
+    if (navigator.share) {
+      try {
+        if (navigator.canShare) {
+          var file = new File([text], fname, { type: "application/json" });
+          if (navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: "tracker backup" }).catch(function () {}); return; }
+        }
+        navigator.share({ title: "tracker backup", text: text }).catch(function () {});
+        return;
+      } catch (e) { return; }
+    }
+    try {
+      var blob = new Blob([text], { type: "application/json" });
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement("a");
+      a.href = url; a.download = fname;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    } catch (e) {}
+  }
+  function copyOut() {
+    var ta = document.getElementById("dp-out");
+    ta.focus(); ta.select();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(ta.value).then(function () { setMsg("Copied to clipboard."); })
+        .catch(function () { setMsg("Couldn\u2019t copy automatically \u2014 tap the text, Select All, then Copy."); });
+    } else { setMsg("Tap the text above, choose Select All, then Copy."); }
+  }
+  function shareOut() {
+    var text = document.getElementById("dp-out").value;
+    if (!text) return;
+    try {
+      if (navigator.canShare) {
+        var file = new File([text], "tracker-" + toKey(state.weekStart) + ".json", { type: "application/json" });
+        if (navigator.canShare({ files: [file] })) { navigator.share({ files: [file], title: "tracker backup" }).then(function () { setMsg("Shared \u2014 save it somewhere safe."); }).catch(function () {}); return; }
+      }
+      if (navigator.share) { navigator.share({ title: "tracker backup", text: text }).then(function () { setMsg("Shared \u2014 save it somewhere safe."); }).catch(function () {}); }
+      else setMsg("Sharing isn\u2019t available here \u2014 use Copy instead.");
+    } catch (e) { setMsg("Sharing isn\u2019t available here \u2014 use Copy instead."); }
+  }
+  function doRestore() {
+    var v = document.getElementById("dp-in").value;
+    try {
+      var parsed = JSON.parse(v), n = 0, days = parsed.days || {};
+      Object.keys(days).forEach(function (date) {
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) { saveDayLS(date, normalizeDay(days[date])); n++; }
+      });
+      if (parsed.week && typeof parsed.week === "object" && typeof parsed.weekStart === "string" && /^\d{4}-\d{2}-\d{2}$/.test(parsed.weekStart)) {
+        saveWeekLS(parsed.weekStart, normalizeWeek(parsed.week));
+      }
+      loadWeek(state.weekStart);
+      document.getElementById("dp-in").value = "";
+      setMsg("Restored " + n + " day" + (n === 1 ? "" : "s") + " of data.");
+    } catch (e) {
+      setMsg("That didn\u2019t read as valid data. Paste the whole JSON you exported.");
+    }
+  }
+
+  /* ---------- events ---------- */
+  function onClick(e) {
+    var el = e.target.closest ? e.target.closest("[data-action]") : null;
+    if (!el) return;
+    var a = el.getAttribute("data-action");
+    var key = el.getAttribute("data-key");
+
+    if (a === "selday") { state.selected = key; renderMain(); }
+    else if (a === "prevweek") { goToWeek(addDays(state.weekStart, -7)); }
+    else if (a === "nextweek") { goToWeek(addDays(state.weekStart, 7)); }
+    else if (a === "thisweek") { goToWeek(mondayOf(new Date())); }
+    else if (a === "check") {
+      if (el.getAttribute("data-scope") === "week") { weekCheck(key); }
+      else { withDay(function (data) { data[key] = (Number(data[key]) + 1) % 3; }); }
+      renderMain();
+    }
+    else if (a === "cinc" || a === "cdec") {
+      var h = byKey[key];
+      var step = Number(h.step) || 1;
+      var delta = (a === "cinc" ? step : -step);
+      withDay(function (data) {
+        if (h.check) {
+          var cur = (data[key] && typeof data[key] === "object") ? data[key] : { n: 0, c: 0 };
+          cur.n = Math.max(0, (Number(cur.n) || 0) + delta);
+          data[key] = cur;
+        } else {
+          data[key] = Math.max(0, (Number(data[key]) || 0) + delta);
+        }
+      });
+      renderMain();
+    }
+    else if (a === "ccheck") {
+      withDay(function (data) {
+        var cur = (data[key] && typeof data[key] === "object") ? data[key] : { n: 0, c: 0 };
+        cur.c = (Number(cur.c) + 1) % 3;
+        data[key] = cur;
+      });
+      renderMain();
+    }
+    else if (a === "rdone") {
+      withDay(function (data) {
+        var cur = shallow(data[key]);
+        var nx = ((Number(cur.done) || 0) + 1) % 3;
+        if (nx === 0) delete cur.done; else cur.done = nx;
+        data[key] = cur;
+      });
+      renderMain();
+    }
+    else if (a === "ropen") { state.open[key] = !state.open[key]; renderMain(); }
+    else if (a === "markoff") { markDay("off"); renderMain(); }
+    else if (a === "markcomplete") { markDay("complete"); renderMain(); }
+    else if (a === "step") {
+      var idx = el.getAttribute("data-idx");
+      withDay(function (data) {
+        var cur = shallow(data[key]);
+        if (cur[idx]) delete cur[idx]; else cur[idx] = true;
+        data[key] = cur;
+      });
+      renderMain();
+    }
+    else if (a === "reset") {
+      if (window.confirm("Clear all entries for this week? This can't be undone.")) {
+        state.days.forEach(function (d) { delDayLS(d.key); d.data = emptyDay(); });
+        delWeekLS(toKey(state.weekStart)); state.weekData = emptyWeek();
+        renderMain();
+      }
+    }
+    else if (a === "resetday") {
+      if (window.confirm("Clear all entries for this day? This can't be undone.")) {
+        var rd = selDay();
+        if (rd) { delDayLS(rd.key); rd.data = emptyDay(); }
+        renderMain();
+      }
+    }
+    else if (a === "quicksave") { quickSave(); }
+  }
+
+  function onChange(e) {
+    var t = e.target;
+    var st = t.closest ? t.closest('[data-action="setstart"]') : null;
+    if (st && st.value) { var p = st.value.split("-"); goToWeek(new Date(+p[0], +p[1] - 1, +p[2])); return; }
+    var mb = t.closest ? t.closest('[data-action="measure"]') : null;
+    if (mb) {
+      // Save on blur/change only; don't re-render so we don't fight the input focus.
+      var d = selDay();
+      if (d) { d.data[mb.getAttribute("data-key")] = mb.value; saveDayLS(d.key, d.data); }
+      return;
+    }
+    var wn = t.closest ? t.closest('[data-action="weeknote"]') : null;
+    if (wn) {
+      var wk = wn.getAttribute("data-key");
+      var data = cloneWeek(state.weekData);
+      var wh = byKey[wk];
+      var cur = data[wk] || { c: 0, t: wh.note || "" };
+      cur.t = wn.value;
+      data[wk] = cur;
+      state.weekData = data;
+      saveWeekLS(toKey(state.weekStart), data);
+      return;
+    }
+  }
+
+  /* ---------- home-screen icon (generated, no extra files) ---------- */
+  function makeIcon() {
+    try {
+      var c = document.createElement("canvas"); c.width = 180; c.height = 180;
+      var x = c.getContext("2d"), r = 40;
+      x.fillStyle = "#d97757";
+      x.beginPath();
+      x.moveTo(r, 0); x.arcTo(180, 0, 180, 180, r); x.arcTo(180, 180, 0, 180, r);
+      x.arcTo(0, 180, 0, 0, r); x.arcTo(0, 0, 180, 0, r); x.closePath(); x.fill();
+      x.fillStyle = "#f7ebe4";
+      x.font = '700 84px system-ui, -apple-system, "Segoe UI", Roboto, sans-serif';
+      x.textAlign = "center"; x.textBaseline = "middle";
+      x.fillText("PR", 90, 100);
+      var url = c.toDataURL("image/png");
+      var apple = document.createElement("link"); apple.rel = "apple-touch-icon"; apple.href = url; document.head.appendChild(apple);
+      var fav = document.createElement("link"); fav.rel = "icon"; fav.href = url; document.head.appendChild(fav);
+    } catch (e) {}
+  }
+
+  /* ---------- init ---------- */
+  document.body.addEventListener("click", onClick);
+  document.body.addEventListener("change", onChange);
+  makeIcon();
+  state.todayKey = toKey(new Date());
+  loadWeek(mondayOf(new Date()));
+})();
+</script>
+</body>
+</html>
